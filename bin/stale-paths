@@ -1,0 +1,203 @@
+#!/usr/bin/env python3
+"""Find repository paths that a comment or a document names and that no longer exist.
+
+  stale-paths FILE...
+
+A file that moves or is renamed leaves behind the comments and docs that point at it, and nothing
+fails, so the next reader follows the reference to nothing. In a Markdown file the whole text is
+read, except fenced blocks, and in a source file only its comments. A path is a word with a `/`
+that ends in a file with an extension, or in a `/` for a folder. It is checked only when every part
+before the last is the name of a folder the repository has, and it counts as there when a file of
+the repository is that path or ends with it, so `services/cleanup.rs` is found as
+`src/services/cleanup.rs`. A word whose folders the repository does not have (an example, another
+project, a URL, a list such as `ci.yml/release.yml`) is left alone, and so is one given at a git
+revision (`v1.0.0:src/schema.ts`). A line that names a removed file on purpose, to tell its history,
+carries `stale-paths: ignore` and is skipped.
+
+Each missing path is printed as `FILE:LINE`. Exits with 1 when it finds one, 2 when a file can't be
+read, and 0 otherwise.
+"""
+import os
+import re
+import subprocess
+import sys
+
+# Extensions a cited file is recognised by. A word ending in anything else (a version, a domain) is
+# not taken for a path.
+EXTENSIONS = {
+    "c", "cc", "cjs", "cpp", "cs", "css", "go", "h", "hpp", "html", "java", "js", "json", "jsx",
+    "kt", "lock", "md", "mjs", "nsh", "ps1", "py", "rb", "rs", "scss", "sh", "sql", "svg", "swift",
+    "toml", "ts", "tsx", "txt", "vue", "xml", "yaml", "yml",
+}
+
+# Where a source file's comments start, by extension. Markdown is read whole.
+SLASH_COMMENTS = {
+    "c", "cc", "cjs", "cpp", "cs", "css", "go", "h", "hpp", "java", "js", "jsx", "kt", "mjs", "rs",
+    "scss", "swift", "ts", "tsx", "vue",
+}
+HASH_COMMENTS = {"nsh", "ps1", "py", "rb", "sh", "toml", "yaml", "yml"}
+MARKDOWN = {"md", "markdown"}
+
+WORD = re.compile(r"[A-Za-z0-9_@./-]+")
+
+# Written on a line that names a removed file on purpose.
+IGNORE_MARK = "stale-paths: ignore"
+
+# Folders a walk without git does not go into.
+SKIPPED_FOLDERS = {".git", "node_modules", "target", "dist", "build", "__pycache__", ".venv"}
+
+# The separator `git ls-files -z` puts between paths.
+NUL = chr(0)
+
+_INDEXES = {}
+
+
+def repository_root(path):
+    """The nearest folder above `path` that holds a `.git`, or None."""
+    folder = os.path.dirname(os.path.abspath(path))
+    while True:
+        if os.path.exists(os.path.join(folder, ".git")):
+            return folder
+        parent = os.path.dirname(folder)
+        if parent == folder:
+            return None
+        folder = parent
+
+
+def repository_index(root):
+    """The repository's files and folders, as `/`-separated paths from `root`, and the names its
+    folders go by. Tracked and untracked files alike, from git when it is there, so a file written a
+    moment ago counts. Built once per root."""
+    if root in _INDEXES:
+        return _INDEXES[root]
+    paths = []
+    try:
+        listed = subprocess.run(
+            ["git", "-C", root, "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+            capture_output=True,
+            check=True,
+        )
+        paths = [entry for entry in listed.stdout.decode("utf-8", "replace").split(NUL) if entry]
+    except (OSError, subprocess.CalledProcessError):
+        for folder, folders, files in os.walk(root):
+            folders[:] = [name for name in folders if name not in SKIPPED_FOLDERS]
+            relative = os.path.relpath(folder, root).replace(os.sep, "/")
+            paths += [name if relative == "." else f"{relative}/{name}" for name in files]
+    files = set(paths)
+    folders = set()
+    for entry in paths:
+        parts = entry.split("/")[:-1]
+        for end in range(1, len(parts) + 1):
+            folders.add("/".join(parts[:end]))
+    folder_names = {folder.rsplit("/", 1)[-1] for folder in folders}
+    _INDEXES[root] = (files, folders, folder_names)
+    return _INDEXES[root]
+
+
+def comment_text(line, extension):
+    """The part of a source line that is a comment, or ""."""
+    stripped = line.lstrip()
+    if extension in SLASH_COMMENTS:
+        if stripped.startswith(("//", "/*", "*")):
+            return stripped
+        index = line.find(" //")
+        return line[index:] if index >= 0 else ""
+    if extension in HASH_COMMENTS:
+        if stripped.startswith("#"):
+            return stripped
+        index = line.find(" #")
+        return line[index:] if index >= 0 else ""
+    return ""
+
+
+def candidates(text):
+    """The words of `text` that look like a path, with what follows a path (`:42`, `#part`,
+    `::item`) cut off."""
+    for match in WORD.finditer(text):
+        word = match.group(0)
+        start = match.start()
+        # A URL, or a path that is part of one.
+        if "://" in text[max(0, start - 8):start + len(word) + 3] or word.startswith("//"):
+            continue
+        word = word.split("::", 1)[0].rstrip(".-")
+        if "/" not in word or word.startswith(("/", ".", "@")) or "//" in word:
+            continue
+        # Glob or placeholder characters right next to it make it a pattern, not a path, and a
+        # `rev:` right before it names the file at a git revision rather than in the tree.
+        before = text[start - 1] if start > 0 else ""
+        if before == ":" and start > 1 and text[start - 2].isalnum():
+            continue
+        after = text[match.end()] if match.end() < len(text) else ""
+        if (before and before in "*<{$%~") or (after and after in "*<>{}$%"):
+            continue
+        last = word.rstrip("/").rsplit("/", 1)[-1]
+        if word.endswith("/") or ("." in last and last.rsplit(".", 1)[1].lower() in EXTENSIONS):
+            yield word
+
+
+def names_something(word, files, folders):
+    """Whether a file (or, for a word ending in `/`, a folder) of the repository is `word` or ends
+    with it, so a path given from a nested source root (`services/x.rs` for `src/services/x.rs`)
+    counts."""
+    wanted = word.rstrip("/")
+    pool = folders if word.endswith("/") else files
+    suffix = "/" + wanted
+    return wanted in pool or any(entry.endswith(suffix) for entry in pool)
+
+
+def check(path):
+    root = repository_root(path)
+    if root is None:
+        return []
+    name = os.path.basename(path)
+    extension = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    if extension not in MARKDOWN | SLASH_COMMENTS | HASH_COMMENTS:
+        return []
+    files, folders, folder_names = repository_index(root)
+    findings = []
+    with open(path, encoding="utf-8") as file:
+        in_fence = False
+        for number, line in enumerate(file, start=1):
+            if extension in MARKDOWN:
+                # A fenced block holds commands and examples, not references.
+                if line.lstrip().startswith(("```", "~~~")):
+                    in_fence = not in_fence
+                    continue
+                text = "" if in_fence else line
+            else:
+                text = comment_text(line, extension)
+            if IGNORE_MARK in line:
+                continue
+            for word in candidates(text):
+                parts = word.rstrip("/").split("/")
+                # Each part before the last has to be the name of a folder the repository has, or
+                # the word is not a path of this repository.
+                leading = parts if word.endswith("/") else parts[:-1]
+                if not all(part in folder_names for part in leading):
+                    continue
+                if not names_something(word, files, folders):
+                    findings.append(f"{path}:{number}: `{word}` does not exist")
+    return findings
+
+
+def main(paths):
+    if not paths:
+        print("usage: " + __doc__.strip().splitlines()[2].strip(), file=sys.stderr)
+        return 2
+    status = 0
+    for path in paths:
+        try:
+            findings = check(path)
+        except (OSError, UnicodeDecodeError) as error:
+            print(f"{path}: {error}", file=sys.stderr)
+            status = 2
+            continue
+        for finding in findings:
+            print(finding)
+        if findings and status == 0:
+            status = 1
+    return status
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

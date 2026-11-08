@@ -11,7 +11,7 @@ to Claude in the same turn.
 /plugin install dev-skills@dev-skills
 ```
 
-The hooks need Python 3 and PyYAML.
+The hooks need Python 3, and `workflow-secrets` also needs PyYAML.
 
 ## Checks
 
@@ -20,6 +20,14 @@ The hooks need Python 3 and PyYAML.
   environment, from the step, the job or the workflow. Those commands run code from outside the
   repository, which can read the secret. The check is also a standalone script,
   `bin/workflow-secrets FILE...`, that exits with 1 when it finds something, so it can run in CI.
+
+- `stale-paths` runs when Claude writes any file in a git repository. It reports each repository
+  path that a comment (in source) or the text (in Markdown, outside fenced blocks) names and that
+  doesn't exist, the reference a moved or renamed file leaves behind. A short path given from a
+  nested source root counts when a file of the repository ends with it, and a word whose folders
+  the repository doesn't have is not taken for a path. A line that names a removed file on purpose
+  carries `stale-paths: ignore`. Also a standalone script, `bin/stale-paths FILE...`, that exits
+  with 1 when it finds something.
 
 ## Tests
 
