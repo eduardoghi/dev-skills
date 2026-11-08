@@ -29,6 +29,12 @@ The hooks need Python 3, and `workflow-secrets` also needs PyYAML.
   carries `stale-paths: ignore`. Also a standalone script, `bin/stale-paths FILE...`, that exits
   with 1 when it finds something.
 
+## Suggested CLAUDE.md rules
+
+`examples/claude-md-rules.md` holds rules that are not checks, to paste into your own `CLAUDE.md`,
+where Claude reads them in every session. It has one now, which keeps Claude from writing the same
+justification in several comments and docs, the copies that drift apart when the code changes.
+
 ## Tests
 
 ```sh
