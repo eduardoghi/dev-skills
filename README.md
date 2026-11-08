@@ -29,6 +29,13 @@ The hooks need Python 3, and `workflow-secrets` also needs PyYAML.
   carries `stale-paths: ignore`. Also a standalone script, `bin/stale-paths FILE...`, that exits
   with 1 when it finds something.
 
+## Skills
+
+- `qt-pitfalls` holds mistakes in QML that compile and pass qmllint but fail on screen, such as
+  JavaScript the QML engine lacks or a popup sized by the list inside it. Its `paths` field makes
+  Claude Code load it only when working on `.qml` files, so other projects pay only for its name
+  and one line.
+
 ## Suggested CLAUDE.md rules
 
 `examples/claude-md-rules.md` holds rules that are not checks, to paste into your own `CLAUDE.md`,

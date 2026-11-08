@@ -1,11 +1,11 @@
 {
   "name": "dev-skills",
-  "description": "Checks for mistakes that keep slipping through reviews of code written with AI help, run as hooks while Claude Code edits files.",
+  "description": "Checks and notes for mistakes that keep slipping through reviews of code written with AI help, run as hooks or loaded as skills while Claude Code edits files.",
   "author": {
     "name": "Eduardo Gonçalves Hillesheim",
     "url": "https://github.com/eduardoghi"
   },
   "repository": "https://github.com/eduardoghi/dev-skills",
   "license": "MIT",
-  "keywords": ["code-review", "github-actions", "security", "hooks"]
+  "keywords": ["code-review", "github-actions", "security", "hooks", "qml", "qt"]
 }
