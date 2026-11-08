@@ -7,5 +7,5 @@
   },
   "repository": "https://github.com/eduardoghi/dev-skills",
   "license": "MIT",
-  "keywords": ["code-review", "github-actions", "security", "hooks", "qml", "qt"]
+  "keywords": ["code-review", "github-actions", "security", "hooks", "qml", "qt", "rust", "cpp"]
 }

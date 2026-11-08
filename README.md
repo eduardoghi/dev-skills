@@ -36,6 +36,11 @@ The hooks need Python 3, and `workflow-secrets` also needs PyYAML.
   Claude Code load it only when working on `.qml` files, so other projects pay only for its name
   and one line.
 
+- `rust-pitfalls` and `cpp-pitfalls` hold mistakes that compile and fail only on an edge or at exit,
+  such as `then_some` evaluating its value before the check, an early return that leaves a lock
+  held, and worker threads racing the cleanup of a driver when the process ends. Each loads only for
+  files of its language.
+
 ## Suggested CLAUDE.md rules
 
 `examples/claude-md-rules.md` holds rules that are not checks, to paste into your own `CLAUDE.md`,
