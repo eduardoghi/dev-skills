@@ -40,7 +40,7 @@ class WorkflowSecrets(unittest.TestCase):
             findings,
             ["'sign' runs `sudo apt-get install --yes minisign` with SIGNING_KEY in its environment"],
         )
-        line = tool.check(path)[0].split(":")[1]
+        line = tool.check(path)[0].split(": ", 1)[0].rsplit(":", 1)[1]
         self.assertEqual(line, "10")
 
     def test_the_install_in_a_step_of_its_own_is_left_alone(self):
