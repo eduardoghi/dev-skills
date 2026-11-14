@@ -41,6 +41,11 @@ The hooks need Python 3, and `workflow-secrets` also needs PyYAML.
   held, and worker threads racing the cleanup of a driver when the process ends. Each loads only for
   files of its language.
 
+- `public-repo-leaks` finds names from private or customer material before a repository is
+  published, in the whole history, the commit messages and the tag messages, with one list of
+  terms you know are sensitive and another extracted from the private material the code was
+  written against.
+
 ## Suggested CLAUDE.md rules
 
 `examples/claude-md-rules.md` holds rules that are not checks, to paste into your own `CLAUDE.md`,
