@@ -16,3 +16,14 @@ already exists in the files related to the change. Don't search widely for a sim
 
 When changing a behavior, update in the same commit the related explanations and references that no
 longer match the implementation.
+
+## Where heavy files go
+
+Before proposing a folder for a tool environment, model weights, a cache or other data read on every
+run, check what kind of drive each candidate is, not only how much space it has free. On Windows,
+`Get-PhysicalDisk` gives the media type and `Get-Partition` maps drive letters to disks.
+
+- Prefer an SSD for what is read often, and leave a large HDD for archives such as finished renders.
+- Package managers that hardlink from a cache, such as uv and pnpm, only do it within one volume, so
+  an environment on the cache's volume avoids a second copy of large packages.
+- Name the media type in the recommendation, so a wrong guess is easy to catch.

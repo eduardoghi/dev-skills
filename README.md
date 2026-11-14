@@ -44,8 +44,10 @@ The hooks need Python 3, and `workflow-secrets` also needs PyYAML.
 ## Suggested CLAUDE.md rules
 
 `examples/claude-md-rules.md` holds rules that are not checks, to paste into your own `CLAUDE.md`,
-where Claude reads them in every session. It has one now, which keeps Claude from writing the same
-justification in several comments and docs, the copies that drift apart when the code changes.
+where Claude reads them in every session. One keeps Claude from writing the same justification in
+several comments and docs, the copies that drift apart when the code changes. Another makes it check
+whether a drive is an SSD or an HDD before proposing it for environments, models and caches, instead
+of picking the one with the most free space.
 
 ## Tests
 
